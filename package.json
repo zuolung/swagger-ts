@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "npx next --port 8080",
+    "dev": "npx next --port 6767",
     "build": "next build",
     "start": "next start"
   },
