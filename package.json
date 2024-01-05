@@ -1,0 +1,28 @@
+{
+  "name": "next",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "npx next --port 8080",
+    "build": "next build",
+    "start": "next start"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/react": "^18.2.46",
+    "antd": "^5.12.7",
+    "jsonc-parser": "^3.2.0",
+    "next": "^12.0.2",
+    "node-fetch": "^3.3.2",
+    "pinyin-pro": "^3.18.6",
+    "prettier": "^3.1.1",
+    "react": "^18.2.0",
+    "react-ace": "^10.1.0",
+    "react-copy-to-clipboard": "^5.1.0",
+    "react-dom": "^18.2.0",
+    "use-deep-compare-effect": "^1.8.1"
+  }
+}
