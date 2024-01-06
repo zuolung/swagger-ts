@@ -193,6 +193,8 @@ export default function () {
 
     if (/^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i.test(currentUrl)) {
       fetchService(currentUrl);
+    } else {
+      message.error('swagger json的地址无效')
     }
     localStorage.setItem("DATA", JSON.stringify(c));
   };
