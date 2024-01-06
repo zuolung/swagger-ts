@@ -14,7 +14,7 @@ import {
 import Head from "next/head";
 import zhCN from "antd/locale/zh_CN";
 import { logo } from "../resource/base64";
-import style from "./style";
+import style from "../style";
 import { transform } from "../utils/transorm";
 // @ts-ignore
 import { CopyToClipboard } from "react-copy-to-clipboard";

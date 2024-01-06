@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "dev": "npx next --port 6767",
-    "build": "next build --port 6767",
-    "start": "next start"
+    "build": "next build",
+    "start": "next start --port 6767"
   },
   "keywords": [],
   "author": "",
