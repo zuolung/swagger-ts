@@ -95,7 +95,7 @@ a {
   height: calc(100vh - 46px);
   overflow-y: scroll;
   overflow-x: hidden;
-  max-width: 280px;
+  width: 300px;
 }
 
 .ant-menu-title-content {
@@ -189,8 +189,16 @@ a {
   border: none !important;
 }
 
+.unsearching-select .ant-select-selection-item {
+  display: none;
+}
+
 .unsearching-select :where(.css-dev-only-do-not-override-13q396f).ant-select:not(.ant-select-customize-input) .ant-select-selector {
   background-color: #8bbe25 !important;
+}
+
+:where(.css-dev-only-do-not-override-13q396f).ant-menu-inline.ant-menu-root .ant-menu-item >.ant-menu-title-content, :where(.css-dev-only-do-not-override-13q396f).ant-menu-inline.ant-menu-root .ant-menu-submenu-title >.ant-menu-title-content {
+  direction: rtl;
 }
 `
 

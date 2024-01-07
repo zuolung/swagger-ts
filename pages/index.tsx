@@ -261,6 +261,7 @@ export default function () {
         onCancel={() => setShow(false)}
         onOk={onConfirm}
         width={1000}
+        confirmLoading={loading}
       >
         <div className="swagger-services">
           {(options || []).map((item, index) => (
@@ -312,7 +313,7 @@ export default function () {
       <div className="header">
         <div className="h-left">
           <img src={logo} alt="" className="logo" />
-          <span className="page-title">swagger</span>
+          <span className="page-title">swagger-ts</span>
         </div>
         <div className="header-right">
           <Select
@@ -493,7 +494,7 @@ export default function () {
                   theme="kuroir"
                   name="blah2"
                   height="calc(100vh - 270px)"
-                  width="700px"
+                  width="900px"
                   fontSize={13}
                   readOnly
                   showGutter={true}

@@ -1,7 +1,8 @@
 import { pinyin } from "pinyin-pro";
 import { versionCompatible } from "./common";
 
-const defKeySpecialMark = '__@#_#@' // definitions引用标识后缀，方便代码字符的replace
+const defKeySpecialMark = "__@#_#@"; // definitions引用标识后缀，方便代码字符的replace
+let i = 0;
 
 /**
  * 过滤符合restful标准的参数类型
@@ -9,7 +10,10 @@ const defKeySpecialMark = '__@#_#@' // definitions引用标识后缀，方便代
  * @param method 请求方法
  * @returns
  */
-function restfullApiParamsFilter(parameters: Record<string, any>, method: string) {
+function restfullApiParamsFilter(
+  parameters: Record<string, any>,
+  method: string
+) {
   const parametersNew = [];
   let filterMap = {
     get: "query",
@@ -28,63 +32,83 @@ function restfullApiParamsFilter(parameters: Record<string, any>, method: string
 
   return parametersNew;
 }
-let recursionKeys = [] // 需要递归，当前文件已经创建的变量
+
+let suffixCodes = '' // 递归引用的类型的代码
+
 /**
  * 转换defination中的Ts代码
  * @param definitions 所有definitions
  * @param deps 当前接口引用的definitions
  * @param codes 接口当前转换的代码
  */
-function createSwaggerBaseType(definitions: { [x: string]: any; }, deps: string | any[], codes: string) {
-  const allFormatDefKeys = Object.keys(definitions)
-  let codesCache: any[] = []
-  let suffixCode = ''
-  for (const key in definitions) {
-    if (deps.includes(key)) {
-      workNextUsed(key)
-    }
-  }
+function createSwaggerBaseType(
+  definitions: { [x: string]: any },
+  deps: string[],
+  codes: string
+) {
+  const allFormatDefKeys = Object.keys(definitions);
+  let deps_ = [...new Set(deps)];
+  let hasReplacedCodesBefore: Record<string, string> = {}
+  let i = 0
+  while (deps_?.length) {
+    i++
+    let nextDeps: string[] = []
+    for (let i = 0; i < deps_.length; i++) {
+      const it = deps_[i]
 
-  function workNextUsed(key: string , parentKeys?: string[]) {
-    let usedDefsKey: string[] = [].concat(parentKeys || [] as any)
-    const def = definitions[key];
-    const parseResult = parseDef(def);
-    // 替换基类中没有的引用
-    parseResult.dependencies?.forEach((d) => {
-      if (!allFormatDefKeys.includes(d)) {
-        parseResult.codes = parseResult.codes.replace(d, "any");
+      const def = definitions[it];
+      const parseResult = parseDef(def);
+      // 替换基类中没有的引用
+      parseResult.dependencies?.forEach((d) => {
+        if (!allFormatDefKeys.includes(d)) {
+          parseResult.codes = parseResult.codes.replace(d, "any");
+        }
+      });
+
+      const reg = new RegExp(it, "g");
+
+      if (!hasReplacedCodesBefore[it]) {
+        hasReplacedCodesBefore[it] = codes
+        codes = codes.replace(reg, parseResult.codes);
+        nextDeps = nextDeps.concat(parseResult.dependencies)
+
+      } else {
+        codes = hasReplacedCodesBefore[it]
+        const defKey = resetDefName(it.replace(defKeySpecialMark, ''))
+        codes = codes.replace(reg, defKey);
+        if (it === 'UFXSCMCloudLowCodeCenterDomainSharedDtosResponseApiCenterApiExternalParamResDto__@#_#@') {
+          console.info(codes, '!!!!!!!!!!!!!!!!')
+        }
+        parseResult.codes = parseResult.codes.replace(reg, defKey);
+        nextDeps = nextDeps.concat(deps_.filter(item => item !== it) || [])
+        hasReplacedCodesBefore = {}
+
+        suffixCodes += `\n export type ${defKey} = ${parseResult.codes} \n`
       }
-    });
-
-    // 解决递归引用问题
-    if (usedDefsKey.includes(key)) {
-      const index = usedDefsKey.indexOf(key)
-      suffixCode += `\n export type ${key.replace(defKeySpecialMark, '')} = ${parseResult.codes} \n`
-      codes = codesCache[index]
-      recursionKeys.push(key)
-      codesCache = []
-      parseResult.dependencies?.forEach(item => {
-        workNextUsed(item, usedDefsKey.splice(0, index))
-      })
-
-      return
     }
-    codesCache.push(codes)
-    // @ts-ignore
-    deps = deps.concat(parseResult.dependencies || [])
-
-    while (codes.includes(key)) {
-      codes = codes.replace(key, parseResult.codes)
-    }
-
-    codes = codes.replace(/\n\[\]/, '[]') + suffixCode
-
-    parseResult.dependencies?.forEach(item => {
-      workNextUsed(item, [key])
-    })
+    deps_ = [...new Set(nextDeps)]
   }
+
+  codes = codes.replace(/\n\[\]/g, '[]')
 
   return codes;
+}
+/**
+ * 倒数第一个驼峰字符串
+ */
+function resetDefName(str: string) {
+  let bCount = 0
+  let newStr = ''
+  for (let i = str.length - 1; i >=0; i--) {
+      if (bCount < 3) {
+        newStr = str[i] + newStr
+      }
+      if (/[A-Z]/.test(str[i])) {
+        bCount += 1
+      }
+  }
+
+  return newStr
 }
 
 /**
@@ -96,44 +120,53 @@ function createSwaggerBaseType(definitions: { [x: string]: any; }, deps: string 
 export async function transform(
   data: Record<string, any>,
   apiUrls?: string[],
-  map?: Record<string, string>,
+  map?: Record<string, string>
 ) {
   // 使用到的接口的描述集合
   const result = {
-    codes: '',
+    codes: "",
   };
+  suffixCodes = ''
   const { definitions } = versionCompatible({
     data: data,
   });
   const paths = data["paths"];
 
-  const _map = map || {}
+  const _map = map || {};
 
   for (const key in paths) {
-    if (apiUrls && !apiUrls.includes(key)) continue
-    const method = _map[key] || Object.keys(paths[key])[0] as string;
+    if (apiUrls && !apiUrls.includes(key)) continue;
+    const method = _map[key] || (Object.keys(paths[key])[0] as string);
     const item = paths[key][method];
     // 请求数据拼装
     let reqCodes = "";
 
-    let parameters: Record<string, any> = versionCompatible({
+    let parameters: any = versionCompatible({
       requestParams: item,
       data: data,
     }).pathsRequestParams;
 
-    // restfulApi请求参数规则
-    parameters = restfullApiParamsFilter(parameters, method);
-    let reqDeps: any[] = []
-    for (const km in parameters) {
-      let it = parameters[km];
-      let name = it.name;
-      if (it.in === "body") {
-        it = it.schema;
-        name = "";
+    let reqDeps: any[] = [];
+
+    // // restfulApi请求参数规则
+    if (Array.isArray(parameters)) {
+      parameters = restfullApiParamsFilter(parameters, method);
+
+      for (const km in parameters) {
+        let it = parameters[km];
+        let name = it.name;
+        if (it.in === "body") {
+          it = it.schema;
+          name = "";
+        }
+        const { codes, dependencies } = parseDef(it, name);
+        reqCodes += `${codes}`;
+        reqDeps = reqDeps.concat(dependencies);
       }
-      const { codes, dependencies } = parseDef(it, name);
+    } else {
+      const { codes, dependencies } = parseDef(parameters);
       reqCodes += `${codes}`;
-      reqDeps = reqDeps.concat(dependencies)
+      reqDeps = reqDeps.concat(dependencies);
     }
 
     if (reqCodes.includes(":")) {
@@ -144,7 +177,7 @@ export async function transform(
 
     if (!reqCodes) reqCodes = "undefined \n";
 
-    reqCodes = createSwaggerBaseType(definitions, reqDeps, reqCodes)
+    reqCodes = createSwaggerBaseType(definitions, reqDeps, reqCodes);
 
     // 响应数据拼装
     let resCodes = ``;
@@ -162,11 +195,15 @@ export async function transform(
       const resParseResult = parseDef(schema);
       resCodes += resParseResult.codes;
 
-      resCodes = createSwaggerBaseType(definitions, resParseResult.dependencies || [], resCodes)
+      resCodes = createSwaggerBaseType(
+        definitions,
+        resParseResult.dependencies || [],
+        resCodes || "undefined"
+      );
     } else {
       resCodes = "undefined";
     }
-    
+
     const typeName = getRequestTypeName(key);
     result.codes += `
     /**
@@ -181,7 +218,9 @@ export async function transform(
     `;
   }
 
-  return result
+  result.codes += suffixCodes
+
+  return result;
 }
 /**
  *
@@ -190,9 +229,14 @@ export async function transform(
  * @param requireArr
  * @returns
  */
-function ifNotRequired(key: string | undefined, required: boolean, requireArr: string | any[] | undefined) {
+function ifNotRequired(
+  key: string | undefined,
+  required: boolean,
+  requireArr: string | any[] | undefined
+) {
   if (required === false) return true;
-  if (requireArr && requireArr.length && !requireArr.includes(key || '')) return true;
+  if (requireArr && requireArr.length && !requireArr.includes(key || ""))
+    return true;
 
   return false;
 }
