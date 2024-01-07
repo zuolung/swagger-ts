@@ -90,6 +90,7 @@ export default function () {
 
   const parseTs = async (m = {} as any) => {
     setLoading(true);
+    console.info(data.current)
     return transform(data.current, selectedKey.split(","), m).then(
       async (res) => {
         try {
@@ -248,6 +249,9 @@ export default function () {
         },
       }}
     >
+    <style jsx global>
+      {style}
+    </style>
       {loading && (
         <div className="loading-box">
           <div className="mask"></div>
@@ -527,9 +531,6 @@ export default function () {
           )}
         </div>
       )}
-        <style jsx global>
-          {style}
-        </style>
       <Head>
         <title>Swagger Ts</title>
         <link rel="icon" href="/favicon.ico" />
