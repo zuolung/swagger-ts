@@ -33,7 +33,8 @@ function restfullApiParamsFilter(
   return parametersNew;
 }
 
-let suffixCodes = '' // 递归引用的类型的代码
+let suffixCodes = '' // 递归引用或者多次调用的类型的类型的代码 
+let hasDefinationKeys: string[] = []
 
 /**
  * 转换defination中的Ts代码
@@ -49,9 +50,10 @@ function createSwaggerBaseType(
   const allFormatDefKeys = Object.keys(definitions);
   let deps_ = [...new Set(deps)];
   let hasReplacedCodesBefore: Record<string, string> = {}
-  let i = 0
-  while (deps_?.length) {
-    i++
+  let depsStack = []
+  let level = 0
+  while (deps_?.length && i < 20) {
+    level++
     let nextDeps: string[] = []
     for (let i = 0; i < deps_.length; i++) {
       const it = deps_[i]
@@ -66,26 +68,32 @@ function createSwaggerBaseType(
       });
 
       const reg = new RegExp(it, "g");
+      const defKey = resetDefName(it.replace(defKeySpecialMark, ''))
 
       if (!hasReplacedCodesBefore[it]) {
         hasReplacedCodesBefore[it] = codes
-        codes = codes.replace(reg, parseResult.codes);
-        nextDeps = nextDeps.concat(parseResult.dependencies)
+        if (hasDefinationKeys.includes(it)) {
+          codes = codes.replace(reg, defKey);
+        } else {
+          codes = codes.replace(reg, parseResult.codes);
+          nextDeps = nextDeps.concat(parseResult.dependencies)
+        }
 
       } else {
         codes = hasReplacedCodesBefore[it]
-        const defKey = resetDefName(it.replace(defKeySpecialMark, ''))
         codes = codes.replace(reg, defKey);
-        if (it === 'UFXSCMCloudLowCodeCenterDomainSharedDtosResponseApiCenterApiExternalParamResDto__@#_#@') {
-          console.info(codes, '!!!!!!!!!!!!!!!!')
-        }
         parseResult.codes = parseResult.codes.replace(reg, defKey);
-        nextDeps = nextDeps.concat(deps_.filter(item => item !== it) || [])
+        let d = depsStack.filter(arr => arr.includes(it))?.[0] || []
+        nextDeps = d.filter(item => item !== it) || []
         hasReplacedCodesBefore = {}
+        hasDefinationKeys.push(it)
 
-        suffixCodes += `\n export type ${defKey} = ${parseResult.codes} \n`
+        suffixCodes += `\n export type ${defKey} = ${createSwaggerBaseType(
+          definitions, parseResult.dependencies, parseResult.codes)} \n`
       }
     }
+    depsStack.push(deps_)
+
     deps_ = [...new Set(nextDeps)]
   }
 
@@ -100,7 +108,7 @@ function resetDefName(str: string) {
   let bCount = 0
   let newStr = ''
   for (let i = str.length - 1; i >=0; i--) {
-      if (bCount < 3) {
+      if (bCount < 4) {
         newStr = str[i] + newStr
       }
       if (/[A-Z]/.test(str[i])) {
@@ -307,7 +315,6 @@ function parseDef(def: Record<string, any>, kk?: string) {
         }
 
         const commentsParams: Record<string, any> = {};
-        if ($value) commentsParams["value"] = $value;
         if ($description) commentsParams["description"] = $description;
 
         const comments = createComments(commentsParams);
@@ -394,7 +401,7 @@ function parseDef(def: Record<string, any>, kk?: string) {
       }
     } else if (data.schema?.$ref || data.$ref) {
       const commentsParams: Record<string, any> = {};
-      if (data.rule) commentsParams["value"] = data.rule;
+      // if (data.rule) commentsParams["value"] = data.rule;
       if (data.description) commentsParams["description"] = data.description;
 
       const comments = createComments(commentsParams);

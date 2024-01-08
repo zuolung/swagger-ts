@@ -101,6 +101,8 @@ export default function () {
             .then((res) => res.text())
             .then((res) => JSON.parse(res));
 
+          if (!formatRes.success) notification.error({ message: '格式化失败' })
+
           res.codes = formatRes.data;
 
           const c: IData = JSON.parse(JSON.stringify(data));
@@ -123,6 +125,7 @@ export default function () {
             message: `格式化错误${err?.msg || ""}`,
             description: `格式化错误${err?.msg || ""}`,
           });
+
         } finally {
           setLoading(false);
         }

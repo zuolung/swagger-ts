@@ -3,13 +3,14 @@ import prettier from 'prettier';
 
 export default async function (req: any, res: any) {
   if (req.body) {
+    const data = JSON.parse(req.body || '{}')
+
     try {
-      const data = JSON.parse(req.body || '{}')
       const c = await formatTs(data.data || '')
       await awaitTime()
       res.status(200).json({ success: true, data: c });
     } catch(err) {
-      res.status(200).json({ success: false, data: undefined, message: err?.toString() });
+      res.status(200).json({ success: false, data: data.data, message: err?.toString() });
     }
   }
 }
