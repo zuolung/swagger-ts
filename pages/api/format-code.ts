@@ -5,10 +5,16 @@ export default async function (req: any, res: any) {
   if (req.body) {
     const data = JSON.parse(req.body || '{}')
 
+    const { codes, requestCodes } = data
+
     try {
-      const c = await formatTs(data.data || '')
+      const codes_ = await formatTs(codes || '')
+      const requestCodes_ = await formatTs(requestCodes || '')
       await awaitTime()
-      res.status(200).json({ success: true, data: c });
+      res.status(200).json({ success: true, data: {
+        codes: codes_,
+        requestCodes: requestCodes_,
+      } });
     } catch(err) {
       res.status(200).json({ success: false, data: data.data, message: err?.toString() });
     }

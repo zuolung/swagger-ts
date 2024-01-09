@@ -1,37 +1,9 @@
 import { pinyin } from "pinyin-pro";
 import { versionCompatible } from "./common";
+import { template } from "./request-template";
 
 const defKeySpecialMark = "__@#_#@"; // definitions引用标识后缀，方便代码字符的replace
 let i = 0;
-
-/**
- * 过滤符合restful标准的参数类型
- * @param parameters 请求字段描述
- * @param method 请求方法
- * @returns
- */
-function restfullApiParamsFilter(
-  parameters: Record<string, any>,
-  method: string
-) {
-  const parametersNew = [];
-  let filterMap = {
-    get: "query",
-    post: "body",
-    put: "body",
-    delete: "body",
-  };
-  // @ts-ignore
-  let filter = filterMap[method] || "body";
-  for (const key in parameters) {
-    const item = parameters[key];
-    if (item.in === filter) {
-      parametersNew.push(item);
-    }
-  }
-
-  return parametersNew;
-}
 
 let suffixCodes = '' // 递归引用或者多次调用的类型的类型的代码 
 let hasDefinationKeys: string[] = []
@@ -133,6 +105,7 @@ export async function transform(
   // 使用到的接口的描述集合
   const result = {
     codes: "",
+    requestCodes: "",
   };
   suffixCodes = ''
   const { definitions } = versionCompatible({
@@ -141,6 +114,7 @@ export async function transform(
   const paths = data["paths"];
 
   const _map = map || {};
+  let apiInfos = []
 
   for (const key in paths) {
     if (apiUrls && !apiUrls.includes(key)) continue;
@@ -155,21 +129,27 @@ export async function transform(
     }).pathsRequestParams;
 
     let reqDeps: any[] = [];
+    let $$inPath: string[] = []
+    let $$inQuery: string[] = []
+    let $$inFormData: string[] = []
 
     // // restfulApi请求参数规则
     if (Array.isArray(parameters)) {
-      parameters = restfullApiParamsFilter(parameters, method);
-
       for (const km in parameters) {
         let it = parameters[km];
-        let name = it.name;
-        if (it.in === "body") {
-          it = it.schema;
-          name = "";
+        if (!['header', 'cookie'].includes(it.in) && !it.name?.includes('[0].')) {
+          let name = it.name;
+          if (it.in === 'path')  $$inPath.push(`"${it.name}"`)
+          if (it.in === 'query')  $$inQuery.push(`"${it.name}"`)
+          if (it.in === 'formData')  $$inFormData.push(`"${it.name}"`)
+          if (it.in === "body" && parameters.length === 1) {
+            it = it.schema;
+            name = "";
+          }
+          const { codes, dependencies } = parseDef(it, name);
+          reqCodes += `${codes}`;
+          reqDeps = reqDeps.concat(dependencies);
         }
-        const { codes, dependencies } = parseDef(it, name);
-        reqCodes += `${codes}`;
-        reqDeps = reqDeps.concat(dependencies);
       }
     } else {
       const { codes, dependencies } = parseDef(parameters);
@@ -212,7 +192,35 @@ export async function transform(
       resCodes = "undefined";
     }
 
+
+    let defKey = responseItem?.schema?.$ref
+      ?.replace("#/components/schemas/", "")
+      ?.replace("#/definitions/", "");
+    let hasResponseData = false;
+    defKey = formatBaseTypeKey(defKey)
+
+    if (defKey) {
+      // @ts-ignore
+      const responseData = definitions[defKey];
+      if (responseData?.type === "object" && responseData?.properties?.data) {
+        hasResponseData = true;
+      }
+    }
+
+    console.info($$inPath, $$inQuery)
+
     const typeName = getRequestTypeName(key);
+    apiInfos.push({
+      url: key,
+      name: typeName,
+      desc: item.summary,
+      method: method,
+      reponseFromData: hasResponseData ? `${typeName}['data']` : "undefined",
+      inFormData: $$inFormData,
+      inPath: $$inPath,
+      inQuery: $$inQuery,
+    })
+
     result.codes += `
     /**
      * ${item.summary || "--"}
@@ -228,6 +236,20 @@ export async function transform(
 
   result.codes += suffixCodes
 
+  if (apiInfos.length) {
+    apiInfos.forEach(it => {
+      result.requestCodes += template.replace('$$importTypes', it.name)
+      .replace('$$description', it.desc)
+      .replace('$$requestName', 'Api' + it.name)
+      .replace(/\$\$importTypes/g, it.name)
+      .replace('$$url', it.url)
+      .replace('$$method', it.method)
+      .replace('$$inFormData', `[${it.inFormData.join(',')}]`)
+      .replace('$$inPath', `[${it.inPath.join(',')}]`)
+      .replace('$$inQuery', `[${it.inQuery.join(',')}]`)
+    })
+  }
+
   return result;
 }
 /**
@@ -240,10 +262,11 @@ export async function transform(
 function ifNotRequired(
   key: string | undefined,
   required: boolean,
-  requireArr: string | any[] | undefined
+  requireArr: string | any[] | undefined,
+  level: number
 ) {
   if (required === false) return true;
-  if (requireArr && requireArr.length && !requireArr.includes(key || ""))
+  if (requireArr && requireArr?.length && !(requireArr?.includes(key || "") && level === 1))
     return true;
 
   return false;
@@ -256,7 +279,8 @@ function ifNotRequired(
  */
 function parseDef(def: Record<string, any>, kk?: string) {
   const dependencies: any[] = [];
-  const result = workUnit(def, kk);
+  const result = workUnit(def, kk, false, def.required);
+  let level = 0
   /**
    *
    * @param data 字段描述数据
@@ -271,12 +295,13 @@ function parseDef(def: Record<string, any>, kk?: string) {
     noMark?: boolean,
     requiredArr?: string[]
   ) {
+    level = 1
     if (key && key.includes(".")) return "";
     // 中文作为字段名的时候，移除无效字符
     if (key && key.match(/[\u4e00-\u9fa5]/g)) {
       key = key.replace(/[\.\,\，\.\-\*\\\/]/g, "");
     }
-    const noRequired = ifNotRequired(key, data.required, requiredArr)
+    const noRequired = ifNotRequired(key, data.required, requiredArr, level)
       ? "?"
       : "";
     const ifNull = data?.nullable === true ? " | null" : "";
@@ -374,10 +399,11 @@ function parseDef(def: Record<string, any>, kk?: string) {
             {
               ...items__,
               description: data.description,
+              required: data.required,
             },
             key,
             true,
-            requiredArr
+            data.required
           );
         } else if (items__ && !isBaseType(type__)) {
           if (items__.properties) res += `{ \n `;
@@ -385,11 +411,12 @@ function parseDef(def: Record<string, any>, kk?: string) {
             {
               ...items__,
               description: data.description,
+              required: data.required,
               rule: 2,
             },
             key,
             true,
-            requiredArr
+            data.required
           );
           if (items__.properties) res += `} ${noMark ? "" : "\n"}`;
         } else if (data.items?.$ref) {

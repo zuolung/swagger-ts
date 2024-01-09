@@ -10,6 +10,7 @@ import {
   Select,
   Spin,
   notification,
+  Tabs,
 } from "antd";
 import Head from "next/head";
 import zhCN from "antd/locale/zh_CN";
@@ -22,6 +23,7 @@ import CodeView from "react-ace";
 import "ace-builds/src-noconflict/theme-kuroir";
 import "ace-builds/src-noconflict/mode-typescript";
 import useDeepCompareEffect from "use-deep-compare-effect";
+import TabPane from "antd/es/tabs/TabPane";
 
 type IData = {
   options: {
@@ -37,6 +39,7 @@ type IData = {
     method?: string;
     methods?: string[];
     moduleName: string;
+    requestCodes?: string
   };
 };
 
@@ -61,6 +64,7 @@ export default function () {
   const [selectedKey, setSelectedKey] = useState("");
   const [loading, setLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
+  const [tab, setTab] = useState('1')
 
   useEffect(() => {
     let d = localStorage.getItem("DATA");
@@ -90,20 +94,20 @@ export default function () {
 
   const parseTs = async (m = {} as any) => {
     setLoading(true);
-    console.info(data.current)
     return transform(data.current, selectedKey.split(","), m).then(
       async (res) => {
         try {
           const formatRes = await fetch(`/api/format-code`, {
             method: "post",
-            body: JSON.stringify({ data: res.codes }),
+            body: JSON.stringify(res),
           })
             .then((res) => res.text())
             .then((res) => JSON.parse(res));
 
           if (!formatRes.success) notification.error({ message: '格式化失败' })
 
-          res.codes = formatRes.data;
+          res.codes = formatRes.data.codes;
+          res.requestCodes = formatRes.data.requestCodes;
 
           const c: IData = JSON.parse(JSON.stringify(data));
           const apis = data.current.paths[selectedKey];
@@ -111,6 +115,7 @@ export default function () {
           const apiItem = data.current.paths[selectedKey][method];
           c.currentApi = {
             code: res?.codes || "",
+            requestCodes: res?.requestCodes || "",
             url: selectedKey,
             desc: apiItem.summary,
             method: method,
@@ -242,6 +247,8 @@ export default function () {
     setData(c);
     localStorage.setItem("DATA", JSON.stringify(c));
   };
+
+  console.info((tab === '1' ? data.currentApi?.code : data.currentApi?.requestCodes) || '')
 
   return (
     <ConfigProvider
@@ -470,6 +477,20 @@ export default function () {
                   </div>
                 </div>
               </div>
+              <Tabs 
+                activeKey={tab}
+                onChange={e => setTab(e)}
+                items={[
+                  {
+                    key: '1',
+                    label: '请求类型'
+                  },
+                  {
+                    key: '2',
+                    label: '请求方法'
+                  },
+                ]}
+              />
               <div className="code-box">
                 <CopyToClipboard
                   text={data.currentApi?.code || ""}
@@ -505,7 +526,7 @@ export default function () {
                   fontSize={13}
                   readOnly
                   showGutter={true}
-                  value={data.currentApi?.code || ""}
+                  value={(tab === '1' ? data.currentApi?.code : data.currentApi?.requestCodes) || ''}
                   setOptions={{
                     enableBasicAutocompletion: false,
                     enableLiveAutocompletion: false,
