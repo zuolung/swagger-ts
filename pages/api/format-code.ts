@@ -8,13 +8,10 @@ export default async function (req: any, res: any) {
     const { codes, requestCodes } = data
 
     try {
-      const codes_ = await formatTs(codes || '')
-      const requestCodes_ = await formatTs(requestCodes || '')
+      data.codes = await formatTs(codes || '')
+      data.requestCodes = await formatTs(requestCodes || '')
       await awaitTime()
-      res.status(200).json({ success: true, data: {
-        codes: codes_,
-        requestCodes: requestCodes_,
-      } });
+      res.status(200).json({ success: true, data: data });
     } catch(err) {
       res.status(200).json({ success: false, data: data.data, message: err?.toString() });
     }
@@ -38,7 +35,7 @@ function formatTs(str: string) {
   return res
 }
 
-function awaitTime(t = 500){
+function awaitTime(t = 300){
   return new Promise(resolve => {
     setTimeout(() => {
       resolve(true)

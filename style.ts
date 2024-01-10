@@ -119,8 +119,18 @@ a {
   position: absolute;
   right: 14px;
   top: 14px;
-  z-index: 999;
+  z-index: 99;
   cursor: pointer;
+}
+
+.api-demo-btn {
+  position: absolute;
+  right: 40px;
+  top: 12px;
+  cursor: pointer;
+  z-index: 99;
+  text-decoration: underline;
+  color: #777;
 }
 
 .info-title {

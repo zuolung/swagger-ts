@@ -11,6 +11,8 @@ import {
   Spin,
   notification,
   Tabs,
+  Drawer,
+  Tooltip,
 } from "antd";
 import Head from "next/head";
 import zhCN from "antd/locale/zh_CN";
@@ -23,7 +25,8 @@ import CodeView from "react-ace";
 import "ace-builds/src-noconflict/theme-kuroir";
 import "ace-builds/src-noconflict/mode-typescript";
 import useDeepCompareEffect from "use-deep-compare-effect";
-import TabPane from "antd/es/tabs/TabPane";
+import { template } from "../utils/request-template";
+import { apiDemo } from "../utils/api-demo-string";
 
 type IData = {
   options: {
@@ -39,7 +42,7 @@ type IData = {
     method?: string;
     methods?: string[];
     moduleName: string;
-    requestCodes?: string
+    requestCodes?: string;
   };
 };
 
@@ -64,7 +67,16 @@ export default function () {
   const [selectedKey, setSelectedKey] = useState("");
   const [loading, setLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
-  const [tab, setTab] = useState('1')
+  const [tab, setTab] = useState("1");
+  const [requestTemplate, setRequestTemplate] = useState(template);
+  const [requestTemplateUed, setRequestTemplateUed] = useState(template);
+  const [open, setOpen] = useState(false);
+  const [demoShow, setDemoShow] = useState(false);
+
+  useEffect(() => {
+    setRequestTemplate(localStorage.getItem("REQUEST_TEMPLATE") || template);
+    setRequestTemplateUed(localStorage.getItem("REQUEST_TEMPLATE") || template);
+  }, []);
 
   useEffect(() => {
     let d = localStorage.getItem("DATA");
@@ -104,7 +116,7 @@ export default function () {
             .then((res) => res.text())
             .then((res) => JSON.parse(res));
 
-          if (!formatRes.success) notification.error({ message: '格式化失败' })
+          if (!formatRes.success) notification.error({ message: "格式化失败" });
 
           res.codes = formatRes.data.codes;
           res.requestCodes = formatRes.data.requestCodes;
@@ -130,7 +142,6 @@ export default function () {
             message: `格式化错误${err?.msg || ""}`,
             description: `格式化错误${err?.msg || ""}`,
           });
-
         } finally {
           setLoading(false);
         }
@@ -203,7 +214,7 @@ export default function () {
     if (/^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i.test(currentUrl)) {
       fetchService(currentUrl);
     } else {
-      message.error('swagger json的地址无效')
+      message.error("swagger json的地址无效");
     }
     localStorage.setItem("DATA", JSON.stringify(c));
   };
@@ -248,7 +259,14 @@ export default function () {
     localStorage.setItem("DATA", JSON.stringify(c));
   };
 
-  console.info((tab === '1' ? data.currentApi?.code : data.currentApi?.requestCodes) || '')
+  const onSaveTemp = () => {
+    setRequestTemplateUed(requestTemplate);
+    localStorage.setItem("REQUEST_TEMPLATE", requestTemplate);
+    setOpen(false);
+    if (selectedKey) {
+      parseTs({});
+    }
+  };
 
   return (
     <ConfigProvider
@@ -259,9 +277,9 @@ export default function () {
         },
       }}
     >
-    <style jsx global>
-      {style}
-    </style>
+      <style jsx global>
+        {style}
+      </style>
       {loading && (
         <div className="loading-box">
           <div className="mask"></div>
@@ -431,6 +449,7 @@ export default function () {
           <div className="menu">
             <Menu
               inlineIndent={12}
+              style={{ height: 'calc(100vh - 46px)' }}
               openKeys={openkey ? [openkey] : []}
               selectedKeys={selectedKey ? [selectedKey] : []}
               items={menus}
@@ -448,18 +467,10 @@ export default function () {
               <div className="api-info">
                 <div className="info-title">{data.currentApi?.desc}</div>
                 <div className="info-row">
-                  <div className="info-l">所属模块:</div>
-                  <div className="info-r">{data.currentApi?.moduleName}</div>
-                </div>
-                <div className="info-row">
                   <div className="info-l">请求路径:</div>
                   <div className="info-r">{data.currentApi?.url}</div>
-                </div>
-                <div className="info-row">
-                  <div className="info-l">请求方法:</div>
-                  <div className="info-r">
-                    <Select
-                      style={{ width: 120 }}
+                  <Select
+                      style={{ width: 120, marginLeft: 20 }}
                       size="small"
                       value={data.currentApi?.method}
                       onChange={(v) =>
@@ -474,29 +485,32 @@ export default function () {
                         </Select.Option>
                       ))}
                     </Select>
-                  </div>
                 </div>
               </div>
-              <Tabs 
+              <Tabs
                 activeKey={tab}
-                onChange={e => setTab(e)}
+                onChange={(e) => setTab(e)}
                 items={[
                   {
-                    key: '1',
-                    label: '请求类型'
+                    key: "1",
+                    label: "请求类型",
                   },
                   {
-                    key: '2',
-                    label: '请求方法'
+                    key: "2",
+                    label: "请求方法",
                   },
                 ]}
               />
               <div className="code-box">
+                <Tooltip title="封装的Api请求方法推荐">
+                  <span className="api-demo-btn" onClick={showRequestDemo}>
+                    api
+                  </span>
+                </Tooltip>
                 <CopyToClipboard
                   text={data.currentApi?.code || ""}
                   onCopy={() => {
                     message.success({
-                      icon: "success",
                       content: "已复制",
                     });
                   }}
@@ -526,7 +540,11 @@ export default function () {
                   fontSize={13}
                   readOnly
                   showGutter={true}
-                  value={(tab === '1' ? data.currentApi?.code : data.currentApi?.requestCodes) || ''}
+                  value={
+                    (tab === "1"
+                      ? data.currentApi?.code
+                      : data.currentApi?.requestCodes) || ""
+                  }
                   setOptions={{
                     enableBasicAutocompletion: false,
                     enableLiveAutocompletion: false,
@@ -555,10 +573,126 @@ export default function () {
           )}
         </div>
       )}
+      <Drawer
+        title="请求方法模版"
+        open={open}
+        width={800}
+        onClose={() => setOpen(false)}
+        style={{ position: "relative" }}
+      >
+        修改下面模板字符串，合理使用$$的变量字符
+        <CodeView
+          mode="typescript"
+          theme="kuroir"
+          name="blah2"
+          height="600px"
+          width="700px"
+          fontSize={13}
+          showGutter={true}
+          value={requestTemplate}
+          onChange={(e) => {
+            setRequestTemplate(e);
+          }}
+        />
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            position: "absolute",
+            bottom: 0,
+            right: 0,
+            padding: "16px 24px",
+            width: "100%",
+          }}
+        >
+          <Button
+            style={{ marginRight: 20 }}
+            onClick={() => {
+              setRequestTemplate(template);
+            }}
+          >
+            重置
+          </Button>
+          <Button type="primary" onClick={onSaveTemp}>
+            保存
+          </Button>
+        </div>
+      </Drawer>
+
+      <svg
+        onClick={() => {
+          setOpen(true);
+          setRequestTemplate(requestTemplateUed);
+        }}
+        style={{ position: "fixed", right: -18, top: "46%", cursor: "pointer" }}
+        viewBox="0 0 1024 1024"
+        width="44"
+        height="44"
+      >
+        <path
+          d="M556.8 960h-73.6c-51.2 0-89.6-41.6-89.6-89.6v-25.6c-35.2-12.8-67.2-28.8-96-51.2l-25.6 12.8c-22.4 12.8-44.8 16-67.2 9.6-22.4-6.4-41.6-22.4-54.4-41.6l-38.4-64c-25.6-44.8-9.6-99.2 32-124.8L160 576c-3.2-22.4-6.4-44.8-6.4-64 0-16 0-32 3.2-48l-22.4-12.8c-44.8-25.6-57.6-80-32-124.8l38.4-64c25.6-44.8 80-57.6 124.8-32l19.2 9.6c28.8-22.4 60.8-41.6 96-54.4v-32C377.6 105.6 416 64 467.2 64h73.6c51.2 0 89.6 41.6 89.6 89.6v28.8c32 12.8 60.8 28.8 89.6 51.2l32-19.2c41.6-25.6 99.2-9.6 124.8 32l38.4 64c25.6 44.8 9.6 99.2-32 124.8l-32 16c3.2 19.2 6.4 38.4 6.4 57.6 0 12.8 0 25.6-3.2 41.6l35.2 22.4c44.8 25.6 57.6 80 32 124.8l-38.4 64c-12.8 22.4-32 35.2-54.4 41.6-22.4 6.4-48 3.2-67.2-9.6l-28.8-16c-25.6 22.4-54.4 41.6-86.4 54.4v35.2c3.2 51.2-38.4 92.8-89.6 92.8z m-256-243.2l16 16c32 28.8 73.6 48 115.2 57.6l25.6 6.4v73.6c0 16 12.8 25.6 25.6 25.6h73.6c16 0 25.6-12.8 25.6-25.6v-80l19.2-6.4c38.4-16 73.6-35.2 102.4-64l16-16 70.4 41.6c6.4 3.2 12.8 3.2 19.2 3.2 6.4-3.2 12.8-6.4 16-12.8l38.4-64c6.4-12.8 3.2-28.8-9.6-35.2l-73.6-41.6 3.2-22.4c3.2-19.2 6.4-35.2 6.4-51.2 0-22.4-3.2-44.8-6.4-67.2l-6.4-22.4 70.4-41.6c12.8-6.4 16-22.4 9.6-35.2l-38.4-64c-3.2-6.4-9.6-9.6-16-12.8-6.4-3.2-12.8 0-19.2 3.2l-73.6 41.6-16-16c-32-28.8-67.2-48-105.6-60.8l-22.4-6.4V153.6c0-16-12.8-25.6-25.6-25.6h-73.6c-16 0-25.6 12.8-25.6 25.6v76.8l-25.6 6.4a300.8 300.8 0 0 0-112 64L288 320 230.4 284.8c-12.8-6.4-28.8-3.2-35.2 9.6l-38.4 64c-6.4 12.8-3.2 28.8 9.6 35.2l60.8 35.2-3.2 22.4c-3.2 19.2-6.4 38.4-6.4 57.6 0 22.4 3.2 48 9.6 73.6l6.4 25.6-57.6 32c-12.8 6.4-16 22.4-9.6 35.2l38.4 64c3.2 6.4 9.6 9.6 16 12.8 6.4 3.2 12.8 0 19.2-3.2l60.8-32z"
+          fill="#8bbe25"
+          p-id="7008"
+        ></path>
+        <path
+          d="M512 672c-89.6 0-160-70.4-160-160s70.4-160 160-160 160 70.4 160 160-70.4 160-160 160z m0-256c-54.4 0-96 41.6-96 96s41.6 96 96 96 96-41.6 96-96-41.6-96-96-96z"
+          fill="#8bbe25"
+          p-id="7009"
+        ></path>
+      </svg>
       <Head>
         <title>Swagger Ts</title>
         <link rel="icon" href="/favicon.ico" />
       </Head>
     </ConfigProvider>
   );
+}
+
+function showRequestDemo() {
+  const m = Modal.confirm({
+    footer: null,
+    title: "api封装推荐",
+    maskClosable: true,
+    width: 1100,
+    style: { top: 20 },
+    content: (
+      <div className="code-box">
+        <CopyToClipboard
+          text={apiDemo || ""}
+          onCopy={() => {
+            message.success({
+              content: "已复制",
+            });
+          }}
+        >
+          <svg
+            className="copy-icon"
+            viewBox="0 0 1024 1024"
+            version="1.1"
+            xmlns="http://www.w3.org/2000/svg"
+            p-id="16639"
+            width="15"
+            height="15"
+          >
+            <path
+              fill="#777"
+              d="M896 810.666667l-128 0c-23.466667 0-42.666667-19.2-42.666667-42.666667 0-23.466667 19.2-42.666667 42.666667-42.666667l106.666667 0c12.8 0 21.333333-8.533333 21.333333-21.333333L896 106.666667c0-12.8-8.533333-21.333333-21.333333-21.333333L448 85.333333c-12.8 0-21.333333 8.533333-21.333333 21.333333l0 21.333333c0 23.466667-19.2 42.666667-42.666667 42.666667-23.466667 0-42.666667-19.2-42.666667-42.666667L341.333333 85.333333c0-46.933333 38.4-85.333333 85.333333-85.333333l469.333333 0c46.933333 0 85.333333 38.4 85.333333 85.333333l0 640C981.333333 772.266667 942.933333 810.666667 896 810.666667zM682.666667 298.666667l0 640c0 46.933333-38.4 85.333333-85.333333 85.333333L128 1024c-46.933333 0-85.333333-38.4-85.333333-85.333333L42.666667 298.666667c0-46.933333 38.4-85.333333 85.333333-85.333333l469.333333 0C644.266667 213.333333 682.666667 251.733333 682.666667 298.666667zM576 298.666667 149.333333 298.666667c-12.8 0-21.333333 8.533333-21.333333 21.333333l0 597.333333c0 12.8 8.533333 21.333333 21.333333 21.333333l426.666667 0c12.8 0 21.333333-8.533333 21.333333-21.333333L597.333333 320C597.333333 307.2 588.8 298.666667 576 298.666667z"
+              p-id="16640"
+            ></path>
+          </svg>
+        </CopyToClipboard>
+        <CodeView
+          mode="typescript"
+          theme="kuroir"
+          name="blah2"
+          height="560px"
+          width="1000px"
+          fontSize={13}
+          showGutter={true}
+          readOnly
+          value={apiDemo}
+        />
+      </div>
+    ),
+  });
 }

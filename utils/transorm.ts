@@ -132,6 +132,7 @@ export async function transform(
     let $$inPath: string[] = []
     let $$inQuery: string[] = []
     let $$inFormData: string[] = []
+    let $$inBody: string[] = []
 
     // // restfulApi请求参数规则
     if (Array.isArray(parameters)) {
@@ -142,6 +143,7 @@ export async function transform(
           if (it.in === 'path')  $$inPath.push(`"${it.name}"`)
           if (it.in === 'query')  $$inQuery.push(`"${it.name}"`)
           if (it.in === 'formData')  $$inFormData.push(`"${it.name}"`)
+          if (it.in === 'body')  $$inBody.push(`"${it.name}"`)
           if (it.in === "body" && parameters.length === 1) {
             it = it.schema;
             name = "";
@@ -219,6 +221,7 @@ export async function transform(
       inFormData: $$inFormData,
       inPath: $$inPath,
       inQuery: $$inQuery,
+      inBody: $$inBody,
     })
 
     result.codes += `
@@ -236,9 +239,11 @@ export async function transform(
 
   result.codes += suffixCodes
 
+  const template_ =  localStorage.getItem('REQUEST_TEMPLATE') || template
+
   if (apiInfos.length) {
     apiInfos.forEach(it => {
-      result.requestCodes += template.replace('$$importTypes', it.name)
+      result.requestCodes += template_.replace('$$importTypes', it.name)
       .replace('$$description', it.desc)
       .replace('$$requestName', 'Api' + it.name)
       .replace(/\$\$importTypes/g, it.name)
@@ -247,6 +252,11 @@ export async function transform(
       .replace('$$inFormData', `[${it.inFormData.join(',')}]`)
       .replace('$$inPath', `[${it.inPath.join(',')}]`)
       .replace('$$inQuery', `[${it.inQuery.join(',')}]`)
+      .replace('$$inBody', `[${it.inBody.join(',')}]`)
+      ?.replace('inPath: [],', '')
+      ?.replace('inQuery: [],', '')
+      ?.replace('inFormData: [],', '')
+      ?.replace('inBody: [],', '');
     })
   }
 
