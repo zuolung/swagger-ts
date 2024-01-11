@@ -4,16 +4,20 @@ function versionCompatible(dna: any) {
   const { data, requestParams, responseData } = dna
   const swaggerVersion = data['swagger'] || data['openapi']
   let definitions = {}
-  let pathsRequestParams = undefined
+  let pathsRequestBody = undefined
   let pathsResponseData = undefined
+  let reqBodyIsFormData = false
 
   if (/^3\./.test(swaggerVersion)) {
     definitions = data['components']['schemas']
     if (requestParams) {
-      pathsRequestParams =
+      if (requestParams['requestBody']?.['content']?.['multipart/form-data']) {
+        reqBodyIsFormData = true
+      }
+      pathsRequestBody =
         requestParams['requestBody']?.['content']?.['application/json'] ||
-        requestParams['requestBody']?.['content']?.['text/json'] ||
-        filterRepeatName(requestParams['parameters'])
+        requestParams['requestBody']?.['content']?.['multipart/form-data'] ||
+        requestParams['requestBody']?.['content']?.['text/json'] 
     }
     if (responseData) {
       pathsResponseData =
@@ -25,7 +29,10 @@ function versionCompatible(dna: any) {
     definitions = data['definitions']
     if (requestParams) {
       // @ts-ignore
-      pathsRequestParams = filterRepeatName(requestParams['parameters'])
+      pathsRequestBody = filterRepeatName(requestParams['parameters']).filter(it => {
+        if (it.in === 'formData') reqBodyIsFormData = true
+        return it.in === 'body' || it.in === 'formData'
+      })
     }
 
     if (responseData) {
@@ -42,8 +49,9 @@ function versionCompatible(dna: any) {
 
   return {
     definitions: newDefinitions,
-    pathsRequestParams,
+    pathsRequestBody,
     pathsResponseData,
+    reqBodyIsFormData,
   }
 }
 // 低版本有可能有重复申明的请求字段类型

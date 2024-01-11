@@ -5,17 +5,16 @@ import { $$importTypes } from "./types"
  * @description $$description
 */
 export async function $$requestName(
-  params:$$importTypes['request']
-): $$importTypes['response'] {
+  params: {
+    inpath: $$importTypes['requestPath']
+    inbody: $$importTypes['requestBody']
+    inQuery: $$importTypes['requestQuery']
+  }
+) {
 
-  return Api(\`$$url\`, params, {
+  return Api<$$importTypes['response']>(\`$$url\`, params, {
     method: "$$method",
-    requestKeys: {
-      inPath: $$inPath,
-      inQuery: $$inQuery,
-      inFormData: $$inFormData,
-      inBody: $$inBody,
-    } 
+    paramsFormData: $$paramsFormData,
   })
 }
 `

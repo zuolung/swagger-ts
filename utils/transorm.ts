@@ -91,6 +91,16 @@ function resetDefName(str: string) {
   return newStr
 }
 
+function codesObjectWrapper(c: string) {
+  if (c.includes(":") && !c.replace(/\s/g,'').startsWith('{')) {
+    c = `{
+        ${c}
+      }`;
+  }
+
+  return c
+}
+
 /**
  *
  * @param data swagger数据
@@ -106,6 +116,7 @@ export async function transform(
   const result = {
     codes: "",
     requestCodes: "",
+    requestExtraInfo: {}
   };
   suffixCodes = ''
   const { definitions } = versionCompatible({
@@ -121,51 +132,77 @@ export async function transform(
     const method = _map[key] || (Object.keys(paths[key])[0] as string);
     const item = paths[key][method];
     // 请求数据拼装
+    let reqDeps: any[] = [];
     let reqCodes = "";
+    let reqCodesInBody = ""
+    let reqCodesInQuery = ""
+    let reqCodesInPath = ""
+    let reqTypesArr = []
 
-    let parameters: any = versionCompatible({
+    let { pathsRequestBody, reqBodyIsFormData }: any = versionCompatible({
       requestParams: item,
       data: data,
-    }).pathsRequestParams;
+    });
 
-    let reqDeps: any[] = [];
-    let $$inPath: string[] = []
-    let $$inQuery: string[] = []
-    let $$inFormData: string[] = []
-    let $$inBody: string[] = []
-
-    // // restfulApi请求参数规则
-    if (Array.isArray(parameters)) {
-      for (const km in parameters) {
-        let it = parameters[km];
+    // inBody的请求的处理
+    if (Array.isArray(pathsRequestBody)) {
+      for (const km in pathsRequestBody) {
+        let it = pathsRequestBody[km];
         if (!['header', 'cookie'].includes(it.in) && !it.name?.includes('[0].')) {
           let name = it.name;
-          if (it.in === 'path')  $$inPath.push(`"${it.name}"`)
-          if (it.in === 'query')  $$inQuery.push(`"${it.name}"`)
-          if (it.in === 'formData')  $$inFormData.push(`"${it.name}"`)
-          if (it.in === 'body')  $$inBody.push(`"${it.name}"`)
-          if (it.in === "body" && parameters.length === 1) {
+          if (it.in === "body" && pathsRequestBody.length === 1) {
             it = it.schema;
             name = "";
           }
           const { codes, dependencies } = parseDef(it, name);
-          reqCodes += `${codes}`;
+          reqCodesInBody += `${codes}`;
           reqDeps = reqDeps.concat(dependencies);
         }
       }
     } else {
-      const { codes, dependencies } = parseDef(parameters);
-      reqCodes += `${codes}`;
+      const { codes, dependencies } = parseDef(pathsRequestBody);
+      reqCodesInBody += `${codes}`;
       reqDeps = reqDeps.concat(dependencies);
     }
-
-    if (reqCodes.includes(":")) {
-      reqCodes = `{
-          ${reqCodes}
-        }`;
+    // 其他请求的处理
+    if (item['parameters']) {
+      const parameters = item['parameters']
+      for (const km in parameters) {
+        let it = parameters[km];
+        if (!['header', 'cookie', 'body'].includes(it.in) && !it.name?.includes('[0].')) {
+          let name = it.name;
+          const { codes, dependencies } = parseDef(it, name);
+          if (it.in === 'query') {
+            reqCodesInQuery += codes
+          }
+          if (it.in === 'path') {
+            reqCodesInPath += codes
+          }
+          reqDeps = reqDeps.concat(dependencies);
+        }
+      }
     }
 
-    if (!reqCodes) reqCodes = "undefined \n";
+    if (reqCodesInBody) {
+      reqCodesInBody = codesObjectWrapper(reqCodesInBody)
+
+      reqCodes += 'requestBody:' + reqCodesInBody + '\n'
+      reqTypesArr.push('body')
+    }
+
+    if (reqCodesInPath) {
+      reqCodesInPath = codesObjectWrapper(reqCodesInPath)
+
+      reqCodes += 'requestPath:' + reqCodesInPath + '\n'
+      reqTypesArr.push('path')
+    }
+
+    if (reqCodesInQuery) {
+      reqCodesInQuery = codesObjectWrapper(reqCodesInQuery)
+
+      reqCodes += 'requestQuery:' + reqCodesInQuery + '\n'
+      reqTypesArr.push('query')
+    }
 
     reqCodes = createSwaggerBaseType(definitions, reqDeps, reqCodes);
 
@@ -209,8 +246,6 @@ export async function transform(
       }
     }
 
-    console.info($$inPath, $$inQuery)
-
     const typeName = getRequestTypeName(key);
     apiInfos.push({
       url: key,
@@ -218,20 +253,24 @@ export async function transform(
       desc: item.summary,
       method: method,
       reponseFromData: hasResponseData ? `${typeName}['data']` : "undefined",
-      inFormData: $$inFormData,
-      inPath: $$inPath,
-      inQuery: $$inQuery,
-      inBody: $$inBody,
+      requestBodyIsFormData: reqBodyIsFormData,
+      reqTypes: reqTypesArr,
     })
+    // @ts-ignore
+    result.requestExtraInfo[key] = {
+      requestBodyIsFormData: reqBodyIsFormData,
+      reqTypes: reqTypesArr,
+    }
 
     result.codes += `
     /**
      * ${item.summary || "--"}
      * @url ${key}
      * @method ${method}
+     * @requestFrom ${reqTypesArr.join(',')}
      */
     export type ${typeName} = {
-      request: ${reqCodes}
+      ${reqCodes}
       response: ${resCodes}
     }
     `;
@@ -249,14 +288,17 @@ export async function transform(
       .replace(/\$\$importTypes/g, it.name)
       .replace('$$url', it.url)
       .replace('$$method', it.method)
-      .replace('$$inFormData', `[${it.inFormData.join(',')}]`)
-      .replace('$$inPath', `[${it.inPath.join(',')}]`)
-      .replace('$$inQuery', `[${it.inQuery.join(',')}]`)
-      .replace('$$inBody', `[${it.inBody.join(',')}]`)
-      ?.replace('inPath: [],', '')
-      ?.replace('inQuery: [],', '')
-      ?.replace('inFormData: [],', '')
-      ?.replace('inBody: [],', '');
+      .replace('$$paramsFormData', it.requestBodyIsFormData)
+
+      if (!it.requestBodyIsFormData) {
+        result.requestCodes = result.requestCodes.replace('paramsFormData: false,', '').replace('paramsFormData: false', '')
+      }
+
+      ['path', 'body', 'query'].forEach(item => {
+        if (it.reqTypes?.includes(item) === false) {
+          result.requestCodes = result.requestCodes.replace(`in${item}: ${it.name}[request${wordFirstBig(item)}];`, '')
+        }
+      })
     })
   }
 
@@ -289,7 +331,7 @@ function ifNotRequired(
  */
 function parseDef(def: Record<string, any>, kk?: string) {
   const dependencies: any[] = [];
-  const result = workUnit(def, kk, false, def.required);
+  const result = workUnit(def, kk, false, def?.required);
   let level = 0
   /**
    *
@@ -306,12 +348,12 @@ function parseDef(def: Record<string, any>, kk?: string) {
     requiredArr?: string[]
   ) {
     level = 1
-    if (key && key.includes(".")) return "";
+    if ((key && key.includes(".")) || !data) return "";
     // 中文作为字段名的时候，移除无效字符
     if (key && key.match(/[\u4e00-\u9fa5]/g)) {
       key = key.replace(/[\.\,\，\.\-\*\\\/]/g, "");
     }
-    const noRequired = ifNotRequired(key, data.required, requiredArr, level)
+    const noRequired = ifNotRequired(key, data?.required, requiredArr, level)
       ? "?"
       : "";
     const ifNull = data?.nullable === true ? " | null" : "";
@@ -438,7 +480,6 @@ function parseDef(def: Record<string, any>, kk?: string) {
       }
     } else if (data.schema?.$ref || data.$ref) {
       const commentsParams: Record<string, any> = {};
-      // if (data.rule) commentsParams["value"] = data.rule;
       if (data.description) commentsParams["description"] = data.description;
 
       const comments = createComments(commentsParams);
@@ -516,6 +557,7 @@ export function wordFirstBig(str: string) {
  * @returns
  */
 export function formatBaseTypeKey(key: any) {
+  if (!key) return key
   let res = key;
   res = res
     .replace("#/components/schemas/", "")

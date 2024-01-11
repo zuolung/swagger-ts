@@ -1,41 +1,48 @@
 export const apiDemo = `import lodash from 'lodash'
+
 // 符合restfullApi标准的可以不考虑requestKeys参数
 type Options = {
   method: "GET" | "POST" | "DELETE" | "PUT" | "get" | "post" | "delete" | "put",
-  requestKeys: {
-    inPath?: string[],        // params在url上的属性集合如/{id}
-    inQuery?: string[],       // params在query上的属性集合
-    inFormData?: string[],    // params在formData上的属性集合
-    inBody?: string[],        // params在body上的属性集合
-  }
+  paramsFormData?: boolean
 }
 
-export default function Api<T extends Record<string, any>, TRes>(
+export default function Api<TRes>(
   url: string,
-  params: T,
+  params: {
+    inbody?: unknown
+    inPath?: unknown
+    inQuery?: unknown
+  },
   options: Options
 ): Promise<TRes> {
-  const { method, requestKeys } = options
-  const queryParams = lodash.pick(params, requestKeys?.inQuery || [])
-  const bodyParams = lodash.pick(params, requestKeys?.inBody || [])
-  const formDataParams = lodash.pick(params, requestKeys?.inFormData || [])  as any
+  const { paramsFormData, method } = options
+  const { inPath = {}, inQuery = {}, inbody = undefined } = params
 
-  requestKeys?.inPath?.forEach(p => {
-    // @ts-ignore
-    url = url.replace(\`{\${p}}\`, params[p])
+  Object.keys(inPath || {})?.forEach(p => {
+    // @ts-ignore 替换如：{id}
+    url = url.replace(\`{\${p}}\`, inPath[p])
   })
 
-  const res = fetch(method == "GET" ? url : getNewUrl(url, queryParams), {
+  const res = fetch(method == "GET" ? url : getNewUrl(url, inQuery), {
     method: method,
-    body: method == "GET" ? null : (requestKeys?.inFormData ? formDataParams : JSON.stringify(bodyParams)),
+    body: paramsFormData ? createFormData(inbody || {}) :  JSON.stringify(inbody || {}),
     headers: {
-      'Content-Type': requestKeys?.inFormData ? 'multipart/form-data' :  'application/json'
+      'Content-Type': paramsFormData ? 'multipart/form-data' :  'application/json'
     }
   }).then((res) => {
     return res.json();
   });
 
   return res;
+}
+
+function createFormData (inbody: any) {
+  const data = new FormData()
+  for (const key in inbody) {
+    data.append(key, inbody[key])
+  }
+
+  return data
 }
 
 function getNewUrl(url: string, params: any) {

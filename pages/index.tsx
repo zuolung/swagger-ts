@@ -13,12 +13,13 @@ import {
   Tabs,
   Drawer,
   Tooltip,
+  Tag,
 } from "antd";
 import Head from "next/head";
 import zhCN from "antd/locale/zh_CN";
 import { logo } from "../resource/base64";
 import style from "../style";
-import { transform } from "../utils/transorm";
+import { transform, wordFirstBig } from "../utils/transorm";
 // @ts-ignore
 import { CopyToClipboard } from "react-copy-to-clipboard";
 import CodeView from "react-ace";
@@ -43,6 +44,7 @@ type IData = {
     methods?: string[];
     moduleName: string;
     requestCodes?: string;
+    requestExtraInfo?: any 
   };
 };
 
@@ -133,6 +135,8 @@ export default function () {
             method: method,
             methods: Object.keys(apis),
             moduleName: apiItem.tags[0],
+            // @ts-ignore
+            requestExtraInfo: res.requestExtraInfo?.[selectedKey]
           };
 
           setData(c);
@@ -267,6 +271,14 @@ export default function () {
       parseTs({});
     }
   };
+
+  const currentRequestCodes = useMemo(() => {
+    if (!data.currentApi?.requestExtraInfo || !data.currentApi?.requestCodes) {
+      return ''
+    }
+
+    return removeUndefinedReqTypes(data.currentApi?.requestCodes, data.currentApi?.requestExtraInfo?.reqTypes)
+  }, [data.currentApi])
 
   return (
     <ConfigProvider
@@ -486,6 +498,20 @@ export default function () {
                       ))}
                     </Select>
                 </div>
+                <div className="info-row">
+                  <div className="info-l">请求参数类型:</div>
+                  <div className="info-r">
+                    {
+                      data.currentApi.requestExtraInfo?.reqTypes?.map((it: string) => <Tag key={it}>{it}</Tag>)
+                    }
+                  </div>
+                </div>
+                <div className="info-row">
+                  <div className="info-l">content-type:</div>
+                  <div className="info-r">
+                    {data.currentApi.requestExtraInfo?.reqBodyIsFormData ? 'multipart/form-data' : 'application/json' }
+                  </div>
+                </div>
               </div>
               <Tabs
                 activeKey={tab}
@@ -508,7 +534,7 @@ export default function () {
                   </span>
                 </Tooltip>
                 <CopyToClipboard
-                  text={data.currentApi?.code || ""}
+                  text={tab === '1' ? data.currentApi?.code : currentRequestCodes}
                   onCopy={() => {
                     message.success({
                       content: "已复制",
@@ -543,7 +569,7 @@ export default function () {
                   value={
                     (tab === "1"
                       ? data.currentApi?.code
-                      : data.currentApi?.requestCodes) || ""
+                      : currentRequestCodes) || ""
                   }
                   setOptions={{
                     enableBasicAutocompletion: false,
@@ -695,4 +721,22 @@ function showRequestDemo() {
       </div>
     ),
   });
+}
+
+function removeUndefinedReqTypes(codes: string, types: string[]) {
+  let codesArr = codes.split('\n');
+
+  ['path', 'body', 'query'].forEach((item: string) => {
+    if (types?.indexOf(item) < 0) {
+      let index = -1
+      codesArr.map((it, i) => {
+         if (it.includes(`["request${wordFirstBig(item)}"]`) && index < 0) {
+          index = i
+         }
+      })
+      codesArr.splice(index, 1)
+    }
+  })
+
+  return codesArr.join('\n')
 }
