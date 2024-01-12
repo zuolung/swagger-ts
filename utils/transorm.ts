@@ -513,7 +513,7 @@ function parseDef(def: Record<string, any>, kk?: string) {
   };
 }
 
-function isBaseType(d?: string) {
+export function isBaseType(d?: string) {
   return !["object", "array"].includes(d || "");
 }
 /**

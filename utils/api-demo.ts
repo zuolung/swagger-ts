@@ -1,11 +1,11 @@
 import lodash from 'lodash'
 
-// 符合restfullApi标准的可以不考虑requestKeys参数
 type Options = {
   method: "GET" | "POST" | "DELETE" | "PUT" | "get" | "post" | "delete" | "put",
   paramsFormData?: boolean
 }
 
+// 符合restfullApi标准的可以不考虑合并body和path两种参数
 export default function Api<TRes>(
   url: string,
   params: {

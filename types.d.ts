@@ -14,5 +14,6 @@ export type IData = {
     moduleName: string;
     requestCodes?: string;
     requestExtraInfo?: any 
+    responseJson?: string
   };
 };

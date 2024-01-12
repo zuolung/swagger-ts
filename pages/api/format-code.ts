@@ -5,15 +5,14 @@ export default async function (req: any, res: any) {
   if (req.body) {
     const data = JSON.parse(req.body || '{}')
 
-    const { codes, requestCodes } = data
-
     try {
-      data.codes = await formatTs(codes || '')
-      data.requestCodes = await formatTs(requestCodes || '')
+      if (data.codes) data.codes = await formatTs(data.codes || '')
+      if (data.requestCodes) data.requestCodes = await formatTs(data.requestCodes || '')
+      if (data.responseJson) data.responseJson = await formatTs(data.responseJson || '', 'json')
       await awaitTime()
       res.status(200).json({ success: true, data: data });
     } catch(err) {
-      res.status(200).json({ success: false, data: data.data, message: err?.toString() });
+      res.status(200).json({ success: false, data: data, message: err?.toString() });
     }
   }
 }
@@ -23,13 +22,13 @@ export default async function (req: any, res: any) {
  * @param str ts代码
  * @returns
  */
-function formatTs(str: string) {
+function formatTs(str: string, lang = 'typescript') {
   // 空对象处理
   str = str?.replace(/\{\}/g, "Record<string, any>");
 
   // eslint-disable-next-line import/no-named-as-default-member
   const res = prettier.format(str, {
-    parser: "typescript",
+    parser: lang,
   });
 
   return res

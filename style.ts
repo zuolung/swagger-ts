@@ -95,7 +95,7 @@ a {
   height: calc(100vh - 46px);
   overflow-y: scroll;
   overflow-x: hidden;
-  width: 340px;
+  width: 360px;
 }
 
 .ant-menu-title-content {

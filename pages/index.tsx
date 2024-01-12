@@ -25,6 +25,7 @@ import { apiDemo } from "../utils/api-demo-string";
 import Header from "../components/header";
 import { IData } from "../types";
 import LeftSetting from "../components/leftSetting";
+import { createMock } from "../utils/mock";
 
 const defaultData = {
   options: [
@@ -74,6 +75,8 @@ export default function () {
     setLoading(true);
     return transform(data.current, selectedKey.split(","), m).then(
       async (res) => {
+        // @ts-ignore
+        res.responseJson = createMock(data.current, data.current?.paths[data?.currentApi?.url]?.[data?.currentApi?.method || ''])
         try {
           const formatRes = await fetch(`/api/format-code`, {
             method: "post",
@@ -86,6 +89,10 @@ export default function () {
 
           res.codes = formatRes.data.codes;
           res.requestCodes = formatRes.data.requestCodes;
+          // @ts-ignore
+          res.responseJson = formatRes.data.responseJson
+
+          console.info(res)
 
           const c: IData = JSON.parse(JSON.stringify(data));
           const apis = data.current.paths[selectedKey];
@@ -101,14 +108,17 @@ export default function () {
             moduleName: apiItem.tags[0],
             // @ts-ignore
             requestExtraInfo: res.requestExtraInfo?.[selectedKey],
+            // @ts-ignore
+            responseJson: res.responseJson,
           };
 
           setData(c);
           localStorage.setItem("DATA", JSON.stringify(c));
         } catch (err: any) {
+          console.info(err)
           notification.error({
             message: `格式化错误${err?.msg || ""}`,
-            description: `格式化错误${err?.msg || ""}`,
+            description: `格式化错误${err?.message || ""}`,
           });
         } finally {
           setLoading(false);
@@ -186,6 +196,14 @@ export default function () {
     );
   }, [data.currentApi]);
 
+  const codesByTab = useMemo(() => {
+    return {
+      "1": data.currentApi?.code,
+      "2": currentRequestCodes,
+      "3": data.currentApi?.responseJson
+    }[tab]
+  }, [data, currentRequestCodes, tab])
+
   return (
     <ConfigProvider
       locale={zhCN}
@@ -222,7 +240,7 @@ export default function () {
         <div className="main">
           <div className="menu">
             <Menu
-              inlineIndent={12}
+              inlineIndent={20}
               style={{ height: "calc(100vh - 46px)" }}
               openKeys={openkey ? [openkey] : []}
               selectedKeys={selectedKey ? [selectedKey] : []}
@@ -242,7 +260,13 @@ export default function () {
                 <div className="info-title">{data.currentApi?.desc}</div>
                 <div className="info-row">
                   <div className="info-l">请求路径:</div>
-                  <div className="info-r">{data.currentApi?.url}</div>
+                  <div 
+                    className="info-r" 
+                    style={{ color: '#8bbe25', textDecoration: 'underline', cursor: 'pointer' }} 
+                    onClick={() => window.open(`/api/mock?data=${encodeURIComponent(data.currentApi?.responseJson || '')}`)}
+                  >
+                      {data.currentApi?.url}
+                  </div>
                   <Select
                     style={{ width: 120, marginLeft: 20 }}
                     size="small"
@@ -289,6 +313,10 @@ export default function () {
                     key: "2",
                     label: "请求方法",
                   },
+                  {
+                    key: "3",
+                    label: "响应Demo",
+                  },
                 ]}
               />
               <div className="code-box">
@@ -298,9 +326,7 @@ export default function () {
                   </span>
                 </Tooltip>
                 <CopyToClipboard
-                  text={
-                    tab === "1" ? data.currentApi?.code : currentRequestCodes
-                  }
+                  text={codesByTab || ''}
                   onCopy={() => {
                     message.success({
                       content: "已复制",
@@ -328,15 +354,11 @@ export default function () {
                   theme="kuroir"
                   name="blah2"
                   height="calc(100vh - 270px)"
-                  width="900px"
+                  width="800px"
                   fontSize={13}
                   readOnly
                   showGutter={true}
-                  value={
-                    (tab === "1"
-                      ? data.currentApi?.code
-                      : currentRequestCodes) || ""
-                  }
+                  value={codesByTab || ''}
                   setOptions={{
                     enableBasicAutocompletion: false,
                     enableLiveAutocompletion: false,
