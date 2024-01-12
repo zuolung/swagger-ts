@@ -119,6 +119,7 @@ export async function transform(
     requestExtraInfo: {}
   };
   suffixCodes = ''
+  hasDefinationKeys = []
   const { definitions } = versionCompatible({
     data: data,
   });
