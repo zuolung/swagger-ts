@@ -8,9 +8,11 @@ export default async function (req: any, res: any) {
     try {
       if (data.codes) data.codes = await formatTs(data.codes || '')
       if (data.requestCodes) data.requestCodes = await formatTs(data.requestCodes || '')
-      data.responseJson = data.responseJson.replace(/\{\}/g, '"$Object@"').replace(/\[\]/g, '"$Array@"')
-      if (data.responseJson) data.responseJson = await formatTs(data.responseJson || '', 'json')
-      data.responseJson = data.responseJson.replace(/\"\$Object\@\"/g, '{}').replace(/\"\$Array\@\"/g, '[]')
+      if (data.responseJson) {
+        data.responseJson = data.responseJson.replace(/\{\}/g, '"$Object@"').replace(/\[\]/g, '"$Array@"')
+        data.responseJson = await formatTs(data.responseJson || '', 'json')
+        data.responseJson = data.responseJson.replace(/\"\$Object\@\"/g, '{}').replace(/\"\$Array\@\"/g, '[]')
+      }
       await awaitTime()
       res.status(200).json({ success: true, data: data });
     } catch(err) {
