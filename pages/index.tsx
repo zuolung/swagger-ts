@@ -76,7 +76,6 @@ export default function () {
     return transform(data.current, selectedKey.split(","), m).then(
       async (res) => {
         // @ts-ignore
-        res.responseJson = createMock(data.current, data.current?.paths[data?.currentApi?.url]?.[data?.currentApi?.method || ''])
         try {
           const formatRes = await fetch(`/api/format-code`, {
             method: "post",
@@ -89,10 +88,6 @@ export default function () {
 
           res.codes = formatRes.data.codes;
           res.requestCodes = formatRes.data.requestCodes;
-          // @ts-ignore
-          res.responseJson = formatRes.data.responseJson
-
-          console.info(res)
 
           const c: IData = JSON.parse(JSON.stringify(data));
           const apis = data.current.paths[selectedKey];
@@ -108,8 +103,6 @@ export default function () {
             moduleName: apiItem.tags[0],
             // @ts-ignore
             requestExtraInfo: res.requestExtraInfo?.[selectedKey],
-            // @ts-ignore
-            responseJson: res.responseJson,
           };
 
           setData(c);
@@ -130,6 +123,7 @@ export default function () {
   useDeepCompareEffect(() => {
     if (selectedKey) {
       parseTs({});
+      setTab('1')
     }
   }, [[selectedKey], data.current]);
 
@@ -204,6 +198,36 @@ export default function () {
     }[tab]
   }, [data, currentRequestCodes, tab])
 
+  const tabChange = async (e: string, unset?: boolean) => {
+    if (!unset) setTab(e)
+    if (e === '3') {
+      return new Promise(async resolve => {
+        setLoading(true)
+        // @ts-ignore
+        const responseJson = createMock(data.current, data.current?.paths[data?.currentApi?.url]?.[data?.currentApi?.method || ''])
+        const formatRes = await fetch(`/api/format-code`, {
+          method: "post",
+          body: JSON.stringify({ responseJson }),
+        })
+          .then((res) => res.text())
+          .then((res) => JSON.parse(res));
+          let c: IData = JSON.parse(JSON.stringify(data));
+          setLoading(false)
+        if (c.currentApi) {
+          c.currentApi.responseJson = formatRes?.data.responseJson
+  
+          setData(c)
+          resolve(formatRes?.data.responseJson)
+        }
+      })
+    }
+  }
+
+  const openMock = async () => {
+    const responseJson = await tabChange('3', true)
+    window.open(`/api/mock?data=${responseJson || '{}'}`)
+  }
+
   return (
     <ConfigProvider
       locale={zhCN}
@@ -263,7 +287,7 @@ export default function () {
                   <div 
                     className="info-r" 
                     style={{ color: '#8bbe25', textDecoration: 'underline', cursor: 'pointer' }} 
-                    onClick={() => window.open(`/api/mock?data=${encodeURIComponent(data.currentApi?.responseJson || '')}`)}
+                    onClick={openMock}
                   >
                       {data.currentApi?.url}
                   </div>
@@ -303,7 +327,7 @@ export default function () {
               </div>
               <Tabs
                 activeKey={tab}
-                onChange={(e) => setTab(e)}
+                onChange={tabChange}
                 items={[
                   {
                     key: "1",

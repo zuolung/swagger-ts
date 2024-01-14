@@ -100,7 +100,7 @@ export default function Header(props: Props) {
           size="small"
           style={
             !isSearching
-              ? { width: 40, transition: "0s All" }
+              ? { width: 140, transition: "0s All" }
               : {
                   width: 340,
                   marginRight: 14,
