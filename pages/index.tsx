@@ -423,7 +423,7 @@ export default function () {
         </div>
       )}
       <Head>
-        <title>Swagger Ts</title>
+        <title>个人接口开发工具</title>
         <link rel="icon" href="/favicon.ico" />
       </Head>
     </ConfigProvider>
