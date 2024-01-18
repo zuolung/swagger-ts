@@ -11,17 +11,20 @@ export function createMock(data: any, apiItem: any) {
 
   const d = work(pathsResponseData)
 
-  function work(data: any, kk?: string) {
+  function work(data: any, kk?: string, usedKey?: string[], stopNext = 0) {
+    if  (!data) return 
     let mm: any
     const d = data?.schema?.$ref || data.$ref
+    let hasUedKey: string[] = [...(usedKey || [])]
 
     if (d) {
       const key = formatBaseTypeKey(d)
       // @ts-ignore
       const next = definitions[key]
-
-      return work(next)
+      hasUedKey.push(key)
+      return work(next, undefined, hasUedKey, countOccurrences(hasUedKey, key))
     } else if (data.type === "object" || data.schema?.type === "object") {
+      if (stopNext > 2) return undefined
       const properties = data.properties || data.schema?.properties;
       if (data.example && typeof data.example === 'object') {
         return data.example
@@ -30,14 +33,14 @@ export function createMock(data: any, apiItem: any) {
       mm = {}
       if (properties) {
         for (const name in properties) {
-          mm[name] = work(properties[name], name)
+          mm[name] = work(properties[name], name, hasUedKey)
         }
       }
 
       return mm
 
     } else if (data.type === "array" || data.schema?.type === "array") {
-      const type__ = data.type || data.schema?.type || {};
+      if (stopNext > 2) return []
       const items__ = data.items || data.schema?.items || {};
       if (data.example && typeof Array.isArray(data.example) && data.example.length) {
         return data.example
@@ -46,7 +49,7 @@ export function createMock(data: any, apiItem: any) {
 
       mm = []
       for (let i = 0; i < randomArrlength; i++) {
-        mm.push(work(items__))
+        mm.push(work(items__, undefined, hasUedKey))
       }
 
       return mm
@@ -92,4 +95,8 @@ function randomEnum(arr: any[]) {
   const ran = Math.floor(Math.random() * (arr.length - 0));
 
   return arr[ran];
+}
+
+function countOccurrences(arr: string[], str: string) {  
+  return arr.filter(item => item === str).length;  
 }
