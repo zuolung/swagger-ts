@@ -30,8 +30,8 @@ import { createMock } from "../utils/mock";
 const defaultData = {
   options: [
     {
-      url: "",
-      title: "",
+      url: "http://121.43.101.170:30002/swagger/docs/v1/UFX.SCM.Cloud.LowCodeCenter",
+      title: "Demo xxxx",
     },
   ],
   current: undefined,

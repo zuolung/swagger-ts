@@ -1,6 +1,6 @@
 import { Dispatch, SetStateAction, useState } from "react";
 import { logo } from "../resource/base64";
-import { Button, Input, Modal, Radio, Select, message } from "antd";
+import { Alert, Button, Input, Modal, Radio, Select, message } from "antd";
 import { IData } from "../types";
 
 type Props = {
@@ -177,6 +177,7 @@ export default function Header(props: Props) {
         confirmLoading={loading}
       >
         <div className="swagger-services">
+          <Alert style={{ marginBottom: 12 }} type="warning" message="请输入公网可以访问的swaggerJSON地址，非公网地址请联系作者在公司内网部署" />
           {(options || []).map((item, index) => (
             <div className="s-row" key={`swagger-services${index}`}>
               <Input

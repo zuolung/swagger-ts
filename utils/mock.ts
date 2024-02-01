@@ -16,7 +16,6 @@ export function createMock(data: any, apiItem: any) {
     let mm: any
     const d = data?.schema?.$ref || data.$ref
     let hasUedKey: string[] = [...(usedKey || [])]
-    console.info('~~~~~~~~~~~', data, kk, usedKey, stopNext)
     if (d) {
       const key = formatBaseTypeKey(d)
       // @ts-ignore
