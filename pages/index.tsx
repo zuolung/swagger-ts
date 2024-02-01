@@ -72,7 +72,11 @@ export default function () {
   }, [data.current]);
 
   const parseTs = async (m = {} as any) => {
+    const c: IData = JSON.parse(JSON.stringify(data));
+    const apis = data.current.paths[selectedKey];
+    if (!apis) return
     setLoading(true);
+
     return transform(data.current, selectedKey.split(","), m).then(
       async (res) => {
         // @ts-ignore
@@ -89,8 +93,6 @@ export default function () {
           res.codes = formatRes.data.codes;
           res.requestCodes = formatRes.data.requestCodes;
 
-          const c: IData = JSON.parse(JSON.stringify(data));
-          const apis = data.current.paths[selectedKey];
           const method = m[selectedKey] || Object.keys(apis)[0];
           const apiItem = data.current.paths[selectedKey][method];
           c.currentApi = {
@@ -485,6 +487,7 @@ function removeUndefinedReqTypes(codes: string, types: string[]) {
   ["path", "body", "query"].forEach((item: string) => {
     if (types?.indexOf(item) < 0) {
       let index = -1;
+      // 找到第一个引用的参数
       codesArr.map((it, i) => {
         if (it.includes(`["request${wordFirstBig(item)}"]`) && index < 0) {
           index = i;
