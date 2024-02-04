@@ -26,6 +26,7 @@ import Header from "../components/header";
 import { IData } from "../types";
 import LeftSetting from "../components/leftSetting";
 import { createMock } from "../utils/mock";
+import Footer from "../components/footer";
 
 const defaultData = {
   options: [
@@ -413,6 +414,8 @@ export default function () {
           )}
         </div>
       )}
+
+      <Footer />
 
       <style jsx global>
         {style}
