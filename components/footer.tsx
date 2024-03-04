@@ -14,7 +14,7 @@ export default function Footer() {
         color: '#eee'
       }}
     >
-      <span onClick={go} style={{ cursor: 'pointer' }}>赣ICP备2024021529</span>
+      <span onClick={go} style={{ cursor: 'pointer' }}>赣ICP2024021529号-1</span>
       <span style={{ color: '#959595' }}> | Copyright © 2024-2027 swagger-ts</span>
     </div>
   );
